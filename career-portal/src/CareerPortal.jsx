@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Briefcase, MapPin, Clock, Upload, Video, CheckCircle, AlertCircle, Loader, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Briefcase, MapPin, Clock, Upload, Video, CheckCircle, AlertCircle, Loader, X, Shield } from 'lucide-react';
 
 const CareerPortal = () => {
   const [selectedJob, setSelectedJob] = useState(null);
@@ -20,6 +20,12 @@ const CareerPortal = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
+  const [recaptchaToken, setRecaptchaToken] = useState(null);
+  const [recaptchaLoaded, setRecaptchaLoaded] = useState(false);
+  const recaptchaRef = useRef(null);
+  const recaptchaWidgetId = useRef(null);
+
+  const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'; // This is Google's test key
 
   const jobs = [
     {
@@ -84,6 +90,61 @@ const CareerPortal = () => {
     }
   ];
 
+  useEffect(() => {
+    if (window.grecaptcha) {
+      setRecaptchaLoaded(true);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
+    script.async = true;
+    script.defer = true;
+
+    window.onRecaptchaLoad = () => {
+      setRecaptchaLoaded(true);
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+      delete window.onRecaptchaLoad;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (recaptchaLoaded && selectedJob && recaptchaRef.current && recaptchaWidgetId.current === null) {
+      try {
+        recaptchaWidgetId.current = window.grecaptcha.render(recaptchaRef.current, {
+          sitekey: RECAPTCHA_SITE_KEY,
+          callback: handleRecaptchaVerify,
+          'expired-callback': handleRecaptchaExpired,
+          'error-callback': handleRecaptchaError,
+        });
+      } catch (error) {
+        console.error('reCAPTCHA render error:', error);
+      }
+    }
+  }, [recaptchaLoaded, selectedJob]);
+
+  const handleRecaptchaVerify = (token) => {
+    setRecaptchaToken(token);
+    setError(null);
+  };
+
+  const handleRecaptchaExpired = () => {
+    setRecaptchaToken(null);
+    setError('reCAPTCHA expired. Please verify again.');
+  };
+
+  const handleRecaptchaError = () => {
+    setRecaptchaToken(null);
+    setError('reCAPTCHA error. Please refresh the page and try again.');
+  };
+
   const resetForm = () => {
     setFormData({
       firstName: '',
@@ -100,6 +161,15 @@ const CareerPortal = () => {
     setCvFile(null);
     setVideoFile(null);
     setError(null);
+    setRecaptchaToken(null);
+    
+    if (window.grecaptcha && recaptchaWidgetId.current !== null) {
+      try {
+        window.grecaptcha.reset(recaptchaWidgetId.current);
+      } catch (error) {
+        console.error('reCAPTCHA reset error:', error);
+      }
+    }
   };
 
   const handleInputChange = (e) => {
@@ -171,6 +241,7 @@ const CareerPortal = () => {
     if (!formData.teamWork.trim()) return 'Please share your teamwork experience';
     if (!formData.adaptQuickly.trim()) return 'Please share your adaptation experience';
     if (!cvFile) return 'CV/Resume is required';
+    if (!recaptchaToken) return 'Please complete the reCAPTCHA verification';
     return null;
   };
 
@@ -207,6 +278,7 @@ const CareerPortal = () => {
       if (videoFile) {
         formDataToSend.append('video', videoFile);
       }
+      formDataToSend.append('recaptchaToken', recaptchaToken);
 
       const apiUrl = import.meta.env.VITE_API_URL;
       
@@ -228,6 +300,15 @@ const CareerPortal = () => {
       setError(err.message || 'Failed to submit application. Please check your connection and try again.');
       console.error('Submission error:', err);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      if (window.grecaptcha && recaptchaWidgetId.current !== null) {
+        try {
+          window.grecaptcha.reset(recaptchaWidgetId.current);
+          setRecaptchaToken(null);
+        } catch (resetError) {
+          console.error('reCAPTCHA reset error:', resetError);
+        }
+      }
     } finally {
       setSubmitting(false);
     }
@@ -236,6 +317,7 @@ const CareerPortal = () => {
   const handleBackToJobs = () => {
     setSelectedJob(null);
     resetForm();
+    recaptchaWidgetId.current = null;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -564,6 +646,32 @@ const CareerPortal = () => {
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Shield size={20} className="text-blue-600" />
+                  Security Verification
+                </h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div ref={recaptchaRef} className="flex justify-center"></div>
+                  {!recaptchaLoaded && (
+                    <div className="text-center text-sm text-gray-500 py-4">
+                      Loading reCAPTCHA...
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-3 text-center">
+                    This site is protected by reCAPTCHA and the Google{' '}
+                    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      Privacy Policy
+                    </a>{' '}
+                    and{' '}
+                    <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      Terms of Service
+                    </a>{' '}
+                    apply.
+                  </p>
                 </div>
               </div>
 

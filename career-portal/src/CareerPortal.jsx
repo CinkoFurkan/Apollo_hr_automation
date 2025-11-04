@@ -208,7 +208,9 @@ const CareerPortal = () => {
         formDataToSend.append('video', videoFile);
       }
 
-      const response = await fetch('http://localhost:5678/webhook-test/application-submission', {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         body: formDataToSend
       });
@@ -236,6 +238,20 @@ const CareerPortal = () => {
     resetForm();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (submitting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <Loader className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-spin" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Submitting Your Application...</h2>
+          <p className="text-gray-600">
+            Please wait while we process your application. This may take a few moments.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -484,7 +500,7 @@ const CareerPortal = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Upload CV/Resume * (PDF max 10MB)
+                      Upload CV/Resume * (PDF only, max 10MB)
                     </label>
                     <div className="space-y-2">
                       <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition w-fit">
@@ -516,7 +532,7 @@ const CareerPortal = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Video Introduction (Mp4, max 50MB)
+                      Video Introduction (MP4 only, max 50MB)
                     </label>
                     <p className="text-sm text-gray-500 mb-2">
                       Record a 1-minute video introducing yourself
@@ -527,7 +543,7 @@ const CareerPortal = () => {
                         Choose Video
                         <input
                           type="file"
-                          accept="video/*"
+                          accept=".mp4"
                           onChange={(e) => handleFileChange(e, 'video')}
                           className="hidden"
                           disabled={submitting}
